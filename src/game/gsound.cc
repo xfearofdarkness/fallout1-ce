@@ -1666,7 +1666,7 @@ static int gsound_close(int fileHandle)
         return -1;
     }
 
-    return db_fclose((DB_FILE*)intToPtr(fileHandle));
+    return db_fclose((DB_FILE*)intToPtr(fileHandle, true));
 }
 
 // 0x44935C
