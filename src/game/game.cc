@@ -53,6 +53,7 @@
 #include "plib/gnw/gnw.h"
 #include "plib/gnw/grbuf.h"
 #include "plib/gnw/input.h"
+#include "plib/gnw/intrface.h"
 #include "plib/gnw/memory.h"
 #include "plib/gnw/svga.h"
 #include "plib/gnw/text.h"
@@ -182,6 +183,25 @@ int game_init(const char* windowTitle, bool isMapper, int font, int flags, int a
 
     if (!game_in_mapper) {
         game_splash_screen();
+    }
+
+    // CE: Handle debug mode (exactly as seen in `mapper2.exe`). Ported from
+    // fallout2-ce. Without this `[debug] mode` in `fallout.cfg` has no
+    // effect and `debug_printf` output (including heap and memory guard
+    // errors) is discarded.
+    char* debugMode;
+    if (config_get_string(&game_config, GAME_CONFIG_DEBUG_KEY, GAME_CONFIG_MODE_KEY, &debugMode)) {
+        if (compat_stricmp(debugMode, "environment") == 0) {
+            debug_register_env();
+        } else if (compat_stricmp(debugMode, "screen") == 0) {
+            debug_register_screen();
+        } else if (compat_stricmp(debugMode, "log") == 0) {
+            debug_register_log("debug.log", "wt");
+        } else if (compat_stricmp(debugMode, "mono") == 0) {
+            debug_register_mono();
+        } else if (compat_stricmp(debugMode, "gnw") == 0) {
+            debug_register_func(win_debug);
+        }
     }
 
     FMInit();
