@@ -5,6 +5,10 @@
 #include "plib/gnw/mouse.h"
 #include "plib/gnw/winmain.h"
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 namespace fallout {
 
 static bool createRenderer(int width, int height);
@@ -84,15 +88,29 @@ bool svga_init(VideoOptions* video_options)
 {
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
 
+#if defined(__APPLE__) && !TARGET_OS_IPHONE
+    // CE: Use native macOS fullscreen (own Space) so Cmd+Tab, Dock, menu bar
+    // and Ctrl+Cmd+F work, and the display mode is never changed.
+    SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, "1");
+#endif
+
     if (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0) {
         return false;
     }
 
     Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI;
 
+#if defined(__APPLE__) && !TARGET_OS_IPHONE
+    windowFlags |= SDL_WINDOW_RESIZABLE;
+
+    if (video_options->fullscreen) {
+        windowFlags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    }
+#else
     if (video_options->fullscreen) {
         windowFlags |= SDL_WINDOW_FULLSCREEN;
     }
+#endif
 
     gSdlWindow = SDL_CreateWindow(GNW95_title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
         video_options->width * video_options->scale,
