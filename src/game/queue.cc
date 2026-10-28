@@ -382,8 +382,13 @@ void queue_clear_type(int eventType, QueueEventHandler* fn)
             curr = *ptr;
 
             if (fn != NULL && fn(tmp->owner, tmp->data) != 1) {
+                // CE: `fn` can add or remove events (and free the one that
+                // followed `tmp`), so re-link `tmp` in front of whatever is
+                // there now instead of its stale `next`.
+                tmp->next = *ptr;
                 *ptr = tmp;
                 ptr = &(tmp->next);
+                curr = *ptr;
             } else {
                 EventTypeDescription* eventTypeDescription = &(q_func[tmp->type]);
                 if (eventTypeDescription->freeProc != NULL) {
@@ -391,6 +396,11 @@ void queue_clear_type(int eventType, QueueEventHandler* fn)
                 }
 
                 mem_free(tmp);
+
+                // SFALL: Re-read next event since `fn` handler can change it.
+                // This fixes crash when leaving the map while waiting for
+                // someone to die of a super stimpak overdose.
+                curr = *ptr;
             }
         } else {
             ptr = &(curr->next);
