@@ -1636,7 +1636,18 @@ static void objs_area_turn_on_off(int a1, int a2, int a3, int a4, int enabled)
     if (a3 > a4) {
         temp = a3;
         a3 = a4;
-        a4 = a3;
+        // CE: Decompiled code assigns `a3` here, losing the upper bound.
+        a4 = temp;
+    }
+
+    // CE: Elevations outside the map are meaningless, clamp them so that the
+    // loop below always terminates.
+    if (a1 < 0) {
+        a1 = 0;
+    }
+
+    if (a2 > ELEVATION_COUNT - 1) {
+        a2 = ELEVATION_COUNT - 1;
     }
 
     while (a1 <= a2) {
@@ -1656,6 +1667,11 @@ static void objs_area_turn_on_off(int a1, int a2, int a3, int a4, int enabled)
             object = obj_find_next_at();
         }
         tile_refresh_rect(&rect, a1);
+
+        // CE: Advance to the next elevation. Without this the loop never
+        // terminates and the game hangs as soon as a script calls
+        // `turn_off_objs_in_area` or `turn_on_objs_in_area`.
+        a1++;
     }
 }
 
