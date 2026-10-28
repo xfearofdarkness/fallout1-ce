@@ -305,20 +305,25 @@ void display_redraw()
         return;
     }
 
-    buf += intface_full_wid * DISPLAY_MONITOR_Y + DISPLAY_MONITOR_X;
+    // CE: Use interface window width as pitch. `intface_full_wid` is the
+    // width of the interface background art which is only guaranteed to
+    // match the window width (640) with the original art.
+    int pitch = win_width(interfaceWindow);
+
+    buf += pitch * DISPLAY_MONITOR_Y + DISPLAY_MONITOR_X;
     buf_to_buf(disp_buf,
         DISPLAY_MONITOR_WIDTH,
         DISPLAY_MONITOR_HEIGHT,
         DISPLAY_MONITOR_WIDTH,
         buf,
-        intface_full_wid);
+        pitch);
 
     int oldFont = text_curr();
     text_font(DISPLAY_MONITOR_FONT);
 
     for (int index = 0; index < max_disp_ptr; index++) {
         int stringIndex = (disp_curr + max_ptr + index - max_disp_ptr) % max_ptr;
-        text_to_buf(buf + index * intface_full_wid * text_height(), disp_str[stringIndex], DISPLAY_MONITOR_WIDTH, intface_full_wid, colorTable[992]);
+        text_to_buf(buf + index * pitch * text_height(), disp_str[stringIndex], DISPLAY_MONITOR_WIDTH, pitch, colorTable[992]);
 
         // Even though the display monitor is rectangular, it's graphic is not.
         // To give a feel of depth it's covered by some metal canopy and
