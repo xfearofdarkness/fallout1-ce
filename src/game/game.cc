@@ -171,8 +171,19 @@ int game_init(const char* windowTitle, bool isMapper, int font, int flags, int a
             int scaleValue;
             if (config_get_value(&resolutionConfig, "MAIN", "SCALE_2X", &scaleValue)) {
                 video_options.scale = scaleValue + 1;
-                video_options.width /= video_options.scale;
-                video_options.height /= video_options.scale;
+
+                // CE: Only allow scaling if resulting game resolution is at
+                // least 640x480 (same as fallout2-ce). Many windows are
+                // hardcoded to 640x480 and cannot be created on a smaller
+                // screen.
+                if (video_options.scale < 1
+                    || video_options.width / video_options.scale < 640
+                    || video_options.height / video_options.scale < 480) {
+                    video_options.scale = 1;
+                } else {
+                    video_options.width /= video_options.scale;
+                    video_options.height /= video_options.scale;
+                }
             }
         }
         config_exit(&resolutionConfig);
