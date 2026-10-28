@@ -2185,9 +2185,10 @@ static void op_obj_can_hear_obj(Program* program)
 
     bool canHear = false;
 
-    // FIXME: This is clearly an error. If any of the object is NULL
-    // dereferencing will crash the game.
-    if (object2 == NULL || object1 == NULL) {
+    // CE: Original code checks `object2 == NULL || object1 == NULL`, which
+    // dereferences NULL when any of the objects is missing and always
+    // reports `false` otherwise. Fixed the same way as in fallout2-ce.
+    if (object2 != NULL && object1 != NULL) {
         if (object2->elevation == object1->elevation) {
             if (object2->tile != -1 && object1->tile != -1) {
                 if (is_within_perception(object1, object2)) {
