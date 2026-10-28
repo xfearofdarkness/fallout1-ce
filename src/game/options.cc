@@ -910,7 +910,7 @@ static int PrefStart()
         prfbmp[i] = art_lock(fid, &(grphkey2[i]), &(ginfo2[i].width), &(ginfo2[i].height));
         if (prfbmp[i] == NULL) {
             while (--i >= 0) {
-                art_ptr_unlock(grphkey2[i - 1]);
+                art_ptr_unlock(grphkey2[i]);
             }
             return -1;
         }
