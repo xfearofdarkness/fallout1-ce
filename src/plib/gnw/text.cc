@@ -320,9 +320,11 @@ void GNW_text_to_buf(unsigned char* buf, const char* str, int swidth, int fullw,
 
     unsigned char* ptr = buf;
     while (*str != '\0') {
-        char ch = *str++;
+        // CE: Treat characters as unsigned, otherwise extended characters
+        // (>= 0x80) are negative and always pass the range check below.
+        unsigned char ch = static_cast<unsigned char>(*str++);
         if (ch < curr_font->num) {
-            FontInfo* glyph = &(curr_font->info[ch & 0xFF]);
+            FontInfo* glyph = &(curr_font->info[ch]);
 
             unsigned char* end;
             if ((color & FONT_MONO) != 0) {
@@ -386,8 +388,10 @@ static int GNW_text_width(const char* str)
     len = 0;
 
     for (i = 0; str[i] != '\0'; i++) {
-        if (str[i] < curr_font->num) {
-            fi = &(curr_font->info[str[i]]);
+        // CE: Treat characters as unsigned to avoid negative indices.
+        unsigned char ch = static_cast<unsigned char>(str[i]);
+        if (ch < curr_font->num) {
+            fi = &(curr_font->info[ch]);
             len += curr_font->spacing + fi->width;
         }
     }
@@ -398,7 +402,13 @@ static int GNW_text_width(const char* str)
 // 0x4C1C64
 static int GNW_text_char_width(char c)
 {
-    return curr_font->info[c].width;
+    // CE: Treat character as unsigned to avoid negative index.
+    unsigned char ch = static_cast<unsigned char>(c);
+    if (ch >= curr_font->num) {
+        return 0;
+    }
+
+    return curr_font->info[ch].width;
 }
 
 // 0x4C1C78
