@@ -24,6 +24,8 @@ static bool cache_purge(Cache* cache);
 static bool cache_resize_array(Cache* cache, int newCapacity);
 static int cache_compare_make_room(const void* a1, const void* a2);
 static int cache_compare_reset_counter(const void* a1, const void* a2);
+static bool cache_heap_check_enabled();
+static void cache_heap_check_failed(Cache* cache, const char* where, int key);
 
 // 0x4FEC7C
 static int lock_sound_ticker = 0;
@@ -120,6 +122,12 @@ bool cache_lock(Cache* cache, int key, void** data, CacheEntry** cacheEntryPtr)
             return false;
         }
 
+        // CE: Optional heap integrity check (see `cache_heap_check_enabled`).
+        // Adding a new entry is where corrupted heap metadata is consumed.
+        if (cache_heap_check_enabled() && !heap_check(&(cache->heap))) {
+            cache_heap_check_failed(cache, "cache_lock (before adding entry)", key);
+        }
+
         if (!cache_add(cache, key, &index)) {
             return false;
         }
@@ -163,6 +171,13 @@ bool cache_unlock(Cache* cache, CacheEntry* cacheEntry)
 
     if (cacheEntry->referenceCount == 0) {
         return false;
+    }
+
+    // CE: Optional heap integrity check (see `cache_heap_check_enabled`).
+    // The caller has just finished using this entry, so if its guards are
+    // broken now, the caller (or something it called) is the prime suspect.
+    if (cache_heap_check_enabled() && !heap_check_block(&(cache->heap), cacheEntry->heapHandleIndex)) {
+        cache_heap_check_failed(cache, "cache_unlock", cacheEntry->key);
     }
 
     cacheEntry->referenceCount--;
@@ -774,6 +789,31 @@ static int cache_compare_reset_counter(const void* a1, const void* a2)
     } else {
         return 0;
     }
+}
+
+// CE: Heap integrity checking is a debugging aid for tracking down code that
+// writes past the end of locked cache data (art frames). It is disabled by
+// default and can be turned on by setting the `FALLOUT_HEAP_CHECK`
+// environment variable to any value except `0`.
+static bool cache_heap_check_enabled()
+{
+    static int enabled = -1;
+
+    if (enabled == -1) {
+        const char* value = getenv("FALLOUT_HEAP_CHECK");
+        enabled = value != NULL && value[0] != '\0' && strcmp(value, "0") != 0 ? 1 : 0;
+    }
+
+    return enabled == 1;
+}
+
+static void cache_heap_check_failed(Cache* cache, const char* where, int key)
+{
+    debug_printf("Heap Error: Corrupted cache heap detected in %s, key 0x%08X.\n", where, key);
+    fprintf(stderr, "Heap Error: Corrupted cache heap detected in %s, key 0x%08X.\n", where, key);
+
+    // Stop right here, so the crash report shows who touched the heap last.
+    abort();
 }
 
 } // namespace fallout

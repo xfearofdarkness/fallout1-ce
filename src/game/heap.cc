@@ -628,6 +628,115 @@ bool heap_validate(Heap* heap)
     return true;
 }
 
+// CE: Quick integrity check of a single block (header/footer guards of the
+// block itself and header guard of the block that follows it in the heap).
+// Unlike `heap_validate` it does not print anything when the block is fine.
+bool heap_check_block(Heap* heap, int handleIndex)
+{
+    if (heap == NULL || handleIndex < 0 || handleIndex >= heap->handlesLength) {
+        return false;
+    }
+
+    HeapHandle* handle = &(heap->handles[handleIndex]);
+    if (handle->state == HEAP_HANDLE_STATE_INVALID || handle->data == NULL) {
+        return false;
+    }
+
+    HeapBlockHeader* blockHeader = (HeapBlockHeader*)handle->data;
+    if (blockHeader->guard != HEAP_BLOCK_HEADER_GUARD) {
+        debug_printf("Heap Error: Bad guard begin detected in block %d.\n", handleIndex);
+        return false;
+    }
+
+    HeapBlockFooter* blockFooter = (HeapBlockFooter*)(handle->data + blockHeader->size + HEAP_BLOCK_HEADER_SIZE);
+    if (blockFooter->guard != HEAP_BLOCK_FOOTER_GUARD) {
+        debug_printf("Heap Error: Bad guard end detected in block %d.\n", handleIndex);
+        return false;
+    }
+
+    if ((handle->state & HEAP_BLOCK_STATE_SYSTEM) == 0) {
+        unsigned char* next = handle->data + blockHeader->size + HEAP_BLOCK_OVERHEAD_SIZE;
+        if (next + HEAP_BLOCK_HEADER_SIZE <= heap->data + heap->size) {
+            HeapBlockHeader* nextBlockHeader = (HeapBlockHeader*)next;
+            if (nextBlockHeader->guard != HEAP_BLOCK_HEADER_GUARD) {
+                debug_printf("Heap Error: Bad guard begin detected in block following block %d.\n", handleIndex);
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+// CE: Same checks as `heap_validate`, but silent unless something is wrong.
+bool heap_check(Heap* heap)
+{
+    if (heap == NULL) {
+        return false;
+    }
+
+    int blocksCount = heap->freeBlocks + heap->moveableBlocks + heap->lockedBlocks;
+    unsigned char* ptr = heap->data;
+
+    int freeBlocks = 0;
+    int moveableBlocks = 0;
+    int lockedBlocks = 0;
+
+    for (int index = 0; index < blocksCount; index++) {
+        if (ptr < heap->data || ptr + HEAP_BLOCK_OVERHEAD_SIZE > heap->data + heap->size) {
+            debug_printf("Heap Error: Ran off end of heap during check (block %d of %d).\n", index, blocksCount);
+            return false;
+        }
+
+        HeapBlockHeader* blockHeader = (HeapBlockHeader*)ptr;
+        if (blockHeader->guard != HEAP_BLOCK_HEADER_GUARD) {
+            debug_printf("Heap Error: Bad guard begin detected during check (block %d at offset %d).\n", index, (int)(ptr - heap->data));
+            return false;
+        }
+
+        if (blockHeader->size < 0 || ptr + blockHeader->size + HEAP_BLOCK_OVERHEAD_SIZE > heap->data + heap->size) {
+            debug_printf("Heap Error: Bad block size %d detected during check (block %d at offset %d).\n", blockHeader->size, index, (int)(ptr - heap->data));
+            return false;
+        }
+
+        HeapBlockFooter* blockFooter = (HeapBlockFooter*)(ptr + blockHeader->size + HEAP_BLOCK_HEADER_SIZE);
+        if (blockFooter->guard != HEAP_BLOCK_FOOTER_GUARD) {
+            debug_printf("Heap Error: Bad guard end detected during check (block %d at offset %d, handle %d).\n", index, (int)(ptr - heap->data), blockHeader->handle_index);
+            return false;
+        }
+
+        switch (blockHeader->state) {
+        case HEAP_BLOCK_STATE_FREE:
+            freeBlocks++;
+            break;
+        case HEAP_BLOCK_STATE_MOVABLE:
+            moveableBlocks++;
+            break;
+        case HEAP_BLOCK_STATE_LOCKED:
+            lockedBlocks++;
+            break;
+        default:
+            debug_printf("Heap Error: Bad block state %u detected during check (block %d at offset %d).\n", blockHeader->state, index, (int)(ptr - heap->data));
+            return false;
+        }
+
+        ptr += blockHeader->size + HEAP_BLOCK_OVERHEAD_SIZE;
+    }
+
+    if (freeBlocks != heap->freeBlocks || moveableBlocks != heap->moveableBlocks || lockedBlocks != heap->lockedBlocks) {
+        debug_printf("Heap Error: Block counts mismatch during check (free %d/%d, moveable %d/%d, locked %d/%d).\n",
+            freeBlocks,
+            heap->freeBlocks,
+            moveableBlocks,
+            heap->moveableBlocks,
+            lockedBlocks,
+            heap->lockedBlocks);
+        return false;
+    }
+
+    return true;
+}
+
 // 0x44A888
 bool heap_stats(Heap* heap, char* dest, size_t size)
 {

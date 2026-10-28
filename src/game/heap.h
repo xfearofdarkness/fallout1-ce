@@ -33,6 +33,8 @@ bool heap_lock(Heap* heap, int handleIndex, unsigned char** bufferPtr);
 bool heap_unlock(Heap* heap, int handleIndex);
 bool heap_stats(Heap* heap, char* dest, size_t size);
 bool heap_validate(Heap* heap);
+bool heap_check_block(Heap* heap, int handleIndex);
+bool heap_check(Heap* heap);
 
 } // namespace fallout
 
